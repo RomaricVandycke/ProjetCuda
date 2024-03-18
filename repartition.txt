@@ -1,0 +1,3 @@
+Thomas: sigmoid, calculate_loss, backdrop
+Paul:calc_layers, train$
+Romaric:get_previous_activation_differential

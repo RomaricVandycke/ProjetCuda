@@ -11,6 +11,8 @@ int bptt_truncate = 5;
 int min_clip_val = -10;
 int max_clip_val = 10;
 
+
+
 double sigmoid(float x){
 	return 1/(1+exp(-x)
 };
@@ -29,10 +31,13 @@ typedef struct {
 } Layer;
 
 	
+#define HIDDEN_SIZE 2
 
-Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_activation, int seq_len, int input_size) {
-    Layer *layers = (Layer *)malloc(seq_len * sizeof(Layer));
-    double mulu[HIDDEN_SIZE][input_size];
+Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_activation, int seq_len, ) {
+    
+	Layer *layers = (Layer *)malloc(seq_len * sizeof(Layer));
+    
+	double mulu[HIDDEN_SIZE][input_size];
     double mulw[HIDDEN_SIZE][HIDDEN_SIZE];
     double mulv[HIDDEN_SIZE][HIDDEN_SIZE];
 
@@ -51,6 +56,7 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
                 }
             }
         }
+
 
         for (int i = 0; i < HIDDEN_SIZE; i++) {
             for (int j = 0; j < HIDDEN_SIZE; j++) {
@@ -100,4 +106,41 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
 
 int main () {
 
+    // creation des matrices
+    int seq_len = 3;
+    int input_size = 2;
+    double **x = malloc(seq_len * sizeof(double *));
+    double **U = malloc(HIDDEN_SIZE * sizeof(double *));
+    double **V = malloc(HIDDEN_SIZE * sizeof(double *));
+    double **W = malloc(HIDDEN_SIZE * sizeof(double *));
+    double *prev_activation = malloc(HIDDEN_SIZE * sizeof(double));
+
+    
+
+    Layer *result = calc_layers(x, U, V, W, prev_activation, seq_len, input_size);
+
+    // suite script
+
+    // free memory
+    for (int i = 0; i < seq_len; i++) {
+        free(result[i].activation);
+        free(result[i].prev_activation);
+    }
+    free(result);
+    free(prev_activation);
+    for (int i = 0; i < seq_len; i++) {
+        free(x[i]);
+    }
+    free(x);
+
+    for (int i = 0; i < HIDDEN_SIZE; i++) {
+        free(U[i]);
+        free(V[i]);
+        free(W[i]);
+    }
+    free(U);
+    free(V);
+    free(W);
+
+    return 0;
 };

@@ -46,7 +46,7 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
         for (int i = 0; i < input_size; i++) {
             new_input[i] = 0;
         }
-        new_input[timestep] = x[timestep][0]; // Assuming x is a 2D array
+        new_input[timestep] = x[timestep][0]; 
 
         for (int i = 0; i < HIDDEN_SIZE; i++) {
             for (int j = 0; j < input_size; j++) {
@@ -101,7 +101,7 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
         }
     }
 
-    return layers;
+    return layers, mulu, mulw, mulv;
 }
 
 int main () {
@@ -144,3 +144,41 @@ int main () {
 
     return 0;
 };
+
+double train(double **U,) {
+    for (int epoch = O; i < max_epochs. i++) {
+
+        double *loss, prev_activation = calculate_loss(X, Y, U, V, W)
+
+    }
+}
+
+def train(U, V, W, X, Y, X_validation, Y_validation):
+    for epoch in range(max_epochs):
+        # calculate initial loss, ie what the output is given a random set of weights
+        loss, prev_activation = calculate_loss(X, Y, U, V, W)
+
+        # check validation loss
+        val_loss, _ = calculate_loss(X_validation, Y_validation, U, V, W)
+
+        print(f'Epoch: {epoch+1}, Loss: {loss}, Validation Loss: {val_loss}')
+
+        # train model/forward pass
+        for i in range(Y.shape[0]):
+            x, y = X[i], Y[i]
+            layers = []
+            prev_activation = np.zeros((hidden_dim, 1))
+
+            layers, mulu, mulw, mulv = calc_layers(x, U, V, W, prev_activation)
+
+            # difference of the prediction
+            dmulv = mulv - y
+            dU, dV, dW = backprop(x, U, V, W, dmulv, mulu, mulw, layers)
+
+            # update weights
+            U -= learning_rate * dU
+            V -= learning_rate * dV
+            W -= learning_rate * dW
+
+    return U, V, W
+

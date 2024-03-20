@@ -353,13 +353,13 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
             new_input[timestep] = x[timestep];
 
 
-            double **dU_i = (double **)malloc(seq_len * sizeof(double *)); 
+            double **dU_i = (double **)malloc(hidden_dim * sizeof(double *)); 
                 
-            for (int i = 0; i < seq_len; i++) {
-                dU_i[i] = (double *)malloc(hidden_dim * sizeof(double));
-                for (int j = 0; j < hidden_dim; j++) {
+            for (int i = 0; i < hidden_dim; i++) {
+                dU_i[i] = (double *)malloc(seq_len * sizeof(double));
+                for (int j = 0; j < seq_len; j++) {
                     dU_i[i][j] = 0;
-                    for (int k = 0; k < hidden_dim; k++) {
+                    for (int k = 0; k < seq_len; k++) {
                         dU_i[i][j] += U[i][k] * new_input[k];
                     }
                 }
@@ -403,16 +403,17 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
             }
         }
     }
-    if (**dV > max_clip_val) {
-        **dV = max_clip_val;
-    }
-    if (**dV < min_clip_val) {
-        **dV = min_clip_val;
-    }
 
-    &dU = dU
-    &dV = dV
-    &dW = dW
+    for (int i = 0; i < output_dim; i++) {
+        for (int j = 0; j < hidden_dim; j++){
+            if (dV[i][j] > max_clip_val) {
+                dV[i][j] = max_clip_val;
+            }
+            if (dV[i][j] < min_clip_val) {
+                dV[i][j] = min_clip_val;
+            }
+        }
+    }
 
     return 0;
 }
@@ -464,56 +465,12 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
 
             // Update weights
             for (int j = 0; j < hidden_dim; j++) {
-                for (int k = 0; k < X.shape[1]; k++) {
+                for (int k = 0; k < seq_len; k++) {
                     U[j][k] -= learning_rate * dU[j][k];
                     V[j][k] -= learning_rate * dV[j][k];
                     W[j][k] -= learning_rate * dW[j][k];
                 }
             }
-
-
-
-           //liberation memoire? utile?
-
-            for (int i = 0; i < num_records - 50; i++) {
-                free(X[i]);
-                free(Y[i]);
-            }
-            free(X);
-            free(Y);    
-
-            for (int i = 0; i < 50; i++) {
-                free(X_validation[i]);
-                free(Y_validation[i]);
-            }
-            free(X_validation);
-            free(Y_validation);
-
-            for (int i = 0; i < seq_len; i++) {
-                free(result[i].activation);
-                free(result[i].prev_activation);
-            }
-            free(result);
-            free(prev_activation);
-
-            for (int i = 0; i < seq_len; i++) {
-                free(x[i]);
-            }
-            free(x);
-
-            for (int i = 0; i < hidden_dim; i++) {
-                free(U[i]);
-                free(V[i]);
-                free(W[i]);
-            }
-            free(U);
-            free(V);
-            free(W);
-
-            for (int j = 0; j < hidden_dim; j++) {
-                free(dmulv[j]);
-            }
-            free(dmulv);
 
 
         }
@@ -603,6 +560,58 @@ int main () {
     // Train the RNN
     
     train(U, V, W, X, Y, X_validation, Y_validation);
+
+
+
+
+   //predictions
+
+   double **val_predictions = (double **)malloc(num_records * sizeof(double *));
+   for (int i = 0; i < num_records; i++) {
+        val_predictions[i] = (double *)malloc(output_dim * sizeof(double));
+   }
+
+    for (int i = 0; i < num_records; i++) {
+        double *x = X[i];
+        double y = Y[i][0];
+        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
+        for (int i = 0; i < hidden_dim; i++) {
+            prev_activation[i] = 0.0;
+        }
+        //memset(prev_activation, 0, hidden_dim * sizeof(double)); // Initialisation à zéro
+
+        for (int timestep = 0; timestep < seq_len; timestep++) {
+
+            double mulu = 0.0;
+            for (int j = 0; j < seq_len; j++) {
+                mulu += U[j][i] * x[j];
+            }
+        
+            double mulw = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                mulw += W[j][i] * prev_activation[j];
+            }
+        
+            double _sum = mulu + mulw;
+        
+            double activation = sigmoid(_sum);
+        
+            double mulv = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                mulv += V[j][i] * activation;
+            }
+        
+            for (int j = 0; j < hidden_dim; j++) {
+            prev_activation[j] = activation;
+            }
+        }
+
+        for (int j = 0; j < output_dim; j++) {
+            val_predictions[i][j] = mulv;
+        }
+    }
+
+
 
     return 0;
 };

@@ -17,9 +17,9 @@ __global__ void matrixMulKernel(float *matriceResultd, float *matriceLeftd, floa
     int tx = threadIdx.x;
     int ty = threadIdx.y;
     printf("Matrice A entrée Kernel:\n");
-    printf("%f",matriceLeftd[5;5]);
+    printf("%f",matriceLeftd[0]);
     printf("\nMatrice B entrée Kernel :\n");
-    printf("%f",matriceRightd[5;5]);
+    printf("%f",matriceRightd[0]);
     // Pvaleur sert au stockage de la valeur calculée par le thread
     float pResult = 0;
     for (int i = 0; i < width; ++i) {

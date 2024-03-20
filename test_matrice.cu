@@ -16,6 +16,10 @@ __global__ void matrixMulKernel(float *matriceResultd, float *matriceLeftd, floa
     // Identifiant de thread à deux dimensions, comme la matrice
     int tx = threadIdx.x;
     int ty = threadIdx.y;
+    printf("Matrice A entrée Kernel:\n");
+    printMatrix(matriceLeft, width);
+    printf("\nMatrice B entrée Kernel :\n");
+    printMatrix(matriceRight, width);
     // Pvaleur sert au stockage de la valeur calculée par le thread
     float pResult = 0;
     for (int i = 0; i < width; ++i) {
@@ -44,7 +48,7 @@ void matrixMulOnDevice(float *matriceResult, float *matriceLeft, float *matriceR
     // Matrice carrée
     dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     // Produit matriciel proprement dit
-    matrixMulKernel<<<dimGrid, dimBlock>>>(globalVarMatrix.matriceResultd, globalVarMatrix.matriceLeftd, globalVarMatrix.matriceRightd, width);
+    matrixMulKernel<<<1, 1>>>(globalVarMatrix.matriceResultd, globalVarMatrix.matriceLeftd, globalVarMatrix.matriceRightd, width);
     // Récupération du résultat du calcul
     cudaMemcpy(matriceResult, globalVarMatrix.matriceResultd, size, cudaMemcpyDeviceToHost);
     // Destruction des matrices, désormais inutilisées
@@ -116,3 +120,5 @@ int main(int argc, char **argv) {
     free(matriceLeft);
     return 0;
 }
+
+

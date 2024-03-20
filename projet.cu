@@ -22,7 +22,7 @@ double mean_squared_error(double *y_true, double *y_pred, int len) {
     double mse = 0.0;
     for (int i = 0; i < len; i++) {
         double error = y_true[i] - y_pred[i];
-        mse += error * error;
+        mse += error * error;   
     }
     return mse / len;
 }
@@ -112,7 +112,7 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
  
     *loss_ = loss;
     *activation_ = activation;
-    
+
 
     return 0;
 }
@@ -272,8 +272,18 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
     double _sum;
     _sum = **mulu + **mulw;
 
-    double *dsv;
-    dsv = (double *)malloc(hidden_dim * sizeof(double));
+    double **dsv = (double **)malloc(hidden_dim * sizeof(double *)); 
+    // Produit matriciel entre la transposée de W et dmulw
+    for (int i = 0; i < hidden_dim; i++) {
+        dsv[i] = (double *)malloc(hidden_dim * sizeof(double));
+        for (int j = 0; j < hidden_dim; j++) {
+            dsv[i][j] = 0;
+            for (int k = 0; k < hidden_dim; k++) {
+                dsv[i][j] += V[k][i] * dmulv[k];
+            }
+        }
+    }
+
 
     double *get_previous_activation_differential(double _sum, double *ds, double **W) {
         
@@ -291,7 +301,7 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
         }
 
 
-        double **result = (double **)malloc(hidden_dim * sizeof(double *)); ;
+        double **result = (double **)malloc(hidden_dim * sizeof(double *)); 
         // Produit matriciel entre la transposée de W et dmulw
         for (int i = 0; i < hidden_dim; i++) {
             result[i] = (double *)malloc(hidden_dim * sizeof(double));
@@ -489,7 +499,7 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
         }
     }
 
-    return U,V,W; // Retourne les poids mis à jour
+    return 0; // Retourne les poids mis à jour
 }
 
 

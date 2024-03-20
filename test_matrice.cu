@@ -1,119 +1,108 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <cuda.h>
 #include <cuda_runtime.h>
 
-#define BLOCK_SIZE 16
-
-struct GlobalVarMatrix{
-    float *matriceLeftd;
-    float *matriceRightd;
-    float *matriceResultd;
-};
-
-__global__ void matrixMulKernel(float *matriceResultd, float *matriceLeftd, float *matriceRightd, int width) {
-    // Identifiant de thread à deux dimensions, comme la matrice
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-    // Pvaleur sert au stockage de la valeur calculée par le thread
-    float pResult = 0;
-    for (int i = 0; i < width; ++i) {
-        float mdElement = matriceLeftd[ty * width + i];
-        float ndElement = matriceRightd[i * width + tx];
-        pResult += mdElement * ndElement;
-    }
-    // Écrit la valeur calculée dans la matrice de résultat
-    // Chaque thread ne peut écrire qu'une valeur !
-    matriceResultd[ty * width + tx] = pResult;
+#define CHECK_CUDA_ERROR(call) { \
+    cudaError_t error = call; \
+    if (error != cudaSuccess) { \
+        printf("CUDA error: %s, line %d\n", cudaGetErrorString(error), __LINE__); \
+        exit(1); \
+    } \
 }
 
-void matrixMulOnDevice(float *matriceResult, float *matriceLeft, float *matriceRight, int width) {
-    // Calcul de la taille des matrices
-    int size = width * width * sizeof(float);
-    // Allocation des matrices et leur remplissage
-    GlobalVarMatrix globalVarMatrix;
-    cudaMalloc(&globalVarMatrix.matriceLeftd, size);
-    cudaMemcpy(globalVarMatrix.matriceLeftd, matriceLeft, size, cudaMemcpyHostToDevice);
-    cudaMalloc(&globalVarMatrix.matriceRightd, size);
-    cudaMemcpy(globalVarMatrix.matriceRightd, matriceRight, size, cudaMemcpyHostToDevice);
-    // Allocation de la matrice de résultat
-    cudaMalloc(&globalVarMatrix.matriceResultd, size);
-    // Multiplication d'une seule matrice
-    dim3 dimGrid(1, 1);
-    // Matrice carrée
-    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
-    // Produit matriciel proprement dit
-    matrixMulKernel<<<dimGrid, dimBlock>>>(globalVarMatrix.matriceResultd, globalVarMatrix.matriceLeftd, globalVarMatrix.matriceRightd, width);
-    // Récupération du résultat du calcul
-    cudaMemcpy(matriceResult, globalVarMatrix.matriceResultd, size, cudaMemcpyDeviceToHost);
-    // Destruction des matrices, désormais inutilisées
-    cudaFree(globalVarMatrix.matriceLeftd);
-    cudaFree(globalVarMatrix.matriceRightd);
-    cudaFree(globalVarMatrix.matriceResultd);
-}
-
-/// Fonction qui initialise le premier terme de la série pseudo-aléatoire
-void initRandom() {
-    time_t t = time(NULL);
-    srand(t);
-}
-
-/// Fonction qui tire un nombre aléatoire entre deux bornes
-float getRandFloat(float inf, float sup) {
-    return inf + (((float) rand()) * (sup - inf)) / ((float) RAND_MAX);
-}
-
-/// Fonction qui initialise une matrice carrée avec des nombres aléatoires
-void initRandomMatrix(float *matrix, size_t size, float inf, float sup) {
-    if (matrix == NULL) return;
-    for (size_t i = 0; i < size * size; ++i) {
-        matrix[i] = getRandFloat(inf, sup);
+// Fonction pour initialiser la matrice avec des valeurs aléatoires
+void initRandomMatrix(float* matrix, int size, float minVal, float maxVal) {
+    for (int i = 0; i < size; ++i) {
+        matrix[i] = minVal + static_cast<float>(rand()) / static_cast<float>(RAND_MAX / (maxVal - minVal));
     }
 }
 
-/// Affiche une matrice carrée
-void printMatrix(float *matrix, int width) {
-    for (int i = 0; i < width; ++i) {
-        for (int j = 0; j < width; ++j) {
-            printf("%.2f ", matrix[i * width + j]);
+// Kernel CUDA pour la multiplication de matrices
+__global__ void matrixMulKernel(const float* A, const float* B, float* C, int width) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < width && col < width) {
+        float value = 0.0f;
+        for (int k = 0; k < width; ++k) {
+            value += A[row * width + k] * B[k * width + col];
         }
-        printf("\n");
+        C[row * width + col] = value;
     }
 }
 
-int main(int argc, char **argv) {
-    initRandom();
-    clock_t temps = clock();
-    float chrono;
-    int width = 4;  // Défini la taille de la matrice
+// Fonction pour la multiplication de matrices sur GPU
+void matrixMulOnDevice(float *C, const float *A, const float *B, int width) {
     int size = width * width * sizeof(float);
-    // On alloue les matrices
-    float *matriceLeft = (float *) malloc(size);
-    float *matriceRight = (float *) malloc(size);
-    float *matriceResult = (float *) malloc(size);
-    // On initialise les matrices aléatoirement
-    initRandomMatrix(matriceLeft, width, -10.0, 10.0);
-    initRandomMatrix(matriceRight, width, -10.0, 10.0);
-    temps = clock() - temps;
-    chrono = ((float) temps) / ((float) CLOCKS_PER_SEC);
+
+    // Allocation de mémoire sur le GPU
+    float *d_A, *d_B, *d_C;
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_A, size));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_B, size));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_C, size));
+
+    // Copie des données du CPU vers le GPU
+    CHECK_CUDA_ERROR(cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice));
+
+    // Définition de la configuration des blocs et des grilles pour le kernel
+    dim3 blockSize(16, 16);
+    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (width + blockSize.y - 1) / blockSize.y);
+
+    // Appel du kernel CUDA pour la multiplication de matrices
+    matrixMulKernel<<<gridSize, blockSize>>>(d_A, d_B, d_C, width);
+
+    // Copie des résultats du GPU vers le CPU
+    CHECK_CUDA_ERROR(cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost));
+
+    // Libération de la mémoire allouée sur le GPU
+    CHECK_CUDA_ERROR(cudaFree(d_A));
+    CHECK_CUDA_ERROR(cudaFree(d_B));
+    CHECK_CUDA_ERROR(cudaFree(d_C));
+}
+
+int main() {
+    srand(time(NULL));
+    const int width = 4;
+    const int size = width * width;
+
+    float *A = (float*)malloc(size * sizeof(float));
+    float *B = (float*)malloc(size * sizeof(float));
+    float *C = (float*)malloc(size * sizeof(float));
+
+    // Initialisation des matrices avec des valeurs aléatoires
+    initRandomMatrix(A, size, -10.0f, 10.0f);
+    initRandomMatrix(B, size, -10.0f, 10.0f);
+
+    // Multiplication de matrices sur GPU
+    matrixMulOnDevice(C, A, B, width);
+
+    // Affichage des matrices
     printf("Matrice A :\n");
-    printMatrix(matriceLeft, width);
-    printf("\nMatrice B :\n");
-    printMatrix(matriceRight, width);
-    printf("\nTemps de l'initialisation : %fs\n", chrono);
-    temps = clock();
-    // On appelle la fonction qui fait la multiplication à notre place
-    matrixMulOnDevice(matriceResult, matriceLeft, matriceRight, width);
-    temps = clock() - temps;
-    chrono = ((float) temps) / ((float) CLOCKS_PER_SEC);
-    printf("\nRésultat de la multiplication :\n");
-    printMatrix(matriceResult, width);
-    printf("\nTemps du calcul de la multiplication : %fs\n", chrono);
-    // On désalloue les matrices
-    free(matriceResult);
-    free(matriceRight);
-    free(matriceLeft);
+    for (int i = 0; i < size; ++i) {
+        printf("%.2f ", A[i]);
+        if ((i + 1) % width == 0) printf("\n");
+    }
+    printf("\n");
+
+    printf("Matrice B :\n");
+    for (int i = 0; i < size; ++i) {
+        printf("%.2f ", B[i]);
+        if ((i + 1) % width == 0) printf("\n");
+    }
+    printf("\n");
+
+    printf("Résultat de la multiplication :\n");
+    for (int i = 0; i < size; ++i) {
+        printf("%.2f ", C[i]);
+        if ((i + 1) % width == 0) printf("\n");
+    }
+
+    // Libération de la mémoire
+    free(A);
+    free(B);
+    free(C);
+
     return 0;
 }
-

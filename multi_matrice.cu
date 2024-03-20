@@ -2,6 +2,15 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 
+typedef float basetype;  // Vous pouvez remplacer "float" par le type de données souhaité
+
+typedef struct resnfo {
+    int seconds;        // Secondes
+    int microseconds;   // Microsecondes
+    // D'autres membres peuvent être ajoutés au besoin
+} resnfo;
+
+
 // Fonctions de multiplication de matrices en C
 void MultMat_CPU(const basetype arrayA[], const basetype arrayB[], 
       basetype arrayR[], const unsigned int n)

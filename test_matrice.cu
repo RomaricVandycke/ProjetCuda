@@ -50,6 +50,7 @@ void matrixMulOnDevice(float *matriceResult, float *matriceLeft, float *matriceR
     // Produit matriciel proprement dit
     matrixMulKernel<<<1, 1>>>(globalVarMatrix.matriceResultd, globalVarMatrix.matriceLeftd, globalVarMatrix.matriceRightd, width);
     // Récupération du résultat du calcul
+    cudaDeviceSynchronize()
     cudaMemcpy(matriceResult, globalVarMatrix.matriceResultd, size, cudaMemcpyDeviceToHost);
     // Destruction des matrices, désormais inutilisées
     cudaFree(globalVarMatrix.matriceLeftd);

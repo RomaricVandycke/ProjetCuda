@@ -11,8 +11,11 @@ typedef struct resnfo {
     // D'autres membres peuvent être ajoutés au besoin
 } resnfo;
 
-void timestamp(struct timespec *ts) {
-    clock_gettime(CLOCK_MONOTONIC, ts);
+void timestamp(resnfo *ts) {
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ts->seconds = start.tv_sec;
+    ts->microseconds = start.tv_nsec / 1000; // Conversion en microsecondes
 }
 
 // Fonctions de multiplication de matrices en C
@@ -55,8 +58,7 @@ __global__ void multmat_kernel_cuda(const basetype *const mA,
 void multmat_GPU(const basetype arrayA[], const basetype arrayB[], 
       basetype arrayR[], const unsigned int n, 
       const unsigned int blk_size, 
-      struct timespec *const start, struct timespec *const end)
-
+      resnfo *const start, resnfo *const end)
 {
     // Número de bytes de cada uno de nuestros vectores
     unsigned int numBytes = n * n* sizeof(basetype);

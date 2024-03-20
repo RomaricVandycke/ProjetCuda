@@ -72,11 +72,21 @@ void initRandomMatrix(float *matrix, size_t size, float inf, float sup) {
     }
 }
 
+/// Affiche une matrice carrée
+void printMatrix(float *matrix, int width) {
+    for (int i = 0; i < width; ++i) {
+        for (int j = 0; j < width; ++j) {
+            printf("%.2f ", matrix[i * width + j]);
+        }
+        printf("\n");
+    }
+}
+
 int main(int argc, char **argv) {
     initRandom();
     clock_t temps = clock();
     float chrono;
-    int width = 10000;  // Défini la taille de la matrice
+    int width = 10;  // Défini la taille de la matrice
     int size = width * width * sizeof(float);
     // On alloue les matrices
     float *matriceLeft = (float *) malloc(size);
@@ -87,16 +97,21 @@ int main(int argc, char **argv) {
     initRandomMatrix(matriceRight, width, -10.0, 10.0);
     temps = clock() - temps;
     chrono = ((float) temps) / ((float) CLOCKS_PER_SEC);
-    printf("Temps de l'initialisation : %fs\n", chrono);
+    printf("Matrice A :\n");
+    printMatrix(matriceLeft, width);
+    printf("\nMatrice B :\n");
+    printMatrix(matriceRight, width);
+    printf("\nTemps de l'initialisation : %fs\n", chrono);
     temps = clock();
     // On appelle la fonction qui fait la multiplication à notre place
     matrixMulOnDevice(matriceResult, matriceLeft, matriceRight, width);
     temps = clock() - temps;
     chrono = ((float) temps) / ((float) CLOCKS_PER_SEC);
-    printf("Temps du calcul de la multiplication : %fs\n", chrono);
+    printf("\nRésultat de la multiplication :\n");
+    printMatrix(matriceResult, width);
+    printf("\nTemps du calcul de la multiplication : %fs\n", chrono);
     // On désalloue les matrices
     free(matriceResult);
     free(matriceRight);
     free(matriceLeft);
     return 0;
-}

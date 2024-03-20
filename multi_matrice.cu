@@ -11,8 +11,11 @@ typedef struct resnfo {
     // D'autres membres peuvent être ajoutés au besoin
 } resnfo;
 
-void timestamp(struct timespec *ts) {
-    clock_gettime(CLOCK_MONOTONIC, ts);
+void timestamp(resnfo *ts) {
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ts->seconds = start.tv_sec;
+    ts->microseconds = start.tv_nsec / 1000; // Conversion en microsecondes
 }
 
 // Fonctions de multiplication de matrices en C

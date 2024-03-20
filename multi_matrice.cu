@@ -59,7 +59,7 @@ void multmat_GPU(const basetype arrayA[], const basetype arrayB[],
     cudaMalloc((void **)&cB, numBytes);
     cudaMalloc((void **)&cR, numBytes);
 
-    cudaMemcpy(cA, arrayA, numBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(cA, arrayA, numBytes, cudaMemcpyHostToDevice); // cudaMemcpy permet de transférer des données entre le CPU et le GPU
     cudaMemcpy(cB, arrayB, numBytes, cudaMemcpyHostToDevice);
 
     dim3 dimBlock(blk_size, blk_size);

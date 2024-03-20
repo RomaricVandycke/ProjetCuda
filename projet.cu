@@ -125,7 +125,7 @@ typedef struct {
 } Layer;
 
 
-Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_activation, double &mulu, double &mulw, double &mulv) {
+Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_activation) {
     
 	Layer *layers = (Layer *)malloc(seq_len * sizeof(Layer));
     
@@ -197,12 +197,8 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
         }
 
     }
-    
-     &mulu = mulu;
-     &mulw = mulw;
-     &mulv = mulv;
 
-    //pb : une fct ne renvoie qun param enC
+
     return layers;
 }
 
@@ -212,7 +208,7 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
 
 
 
-double **backprop(double **x, double **U, double **V, double **W, double *dmulv, double **mulu, double **mulw, Layer *layers, double &dU, double &dV, double &dW) {
+double **backprop(double **x, double **U, double **V, double **W, double *dmulv, double **mulu, double **mulw, Layer *layers) {
 
 
 
@@ -221,11 +217,8 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
     double **dW = (double **)malloc(hidden_dim * sizeof(double *));
     
     double **dU_t = (double **)malloc(hidden_dim * sizeof(double *));
-    double **dV_t = (double **)malloc(output_dim * sizeof(double *));
     double **dW_t = (double **)malloc(hidden_dim * sizeof(double *)); 
     
-    double **dU_i = (double **)malloc(hidden_dim * sizeof(double *));
-    double **dW_i = (double **)malloc(hidden_dim * sizeof(double *));
 
 
     for (int i = 0; i < hidden_dim; i++) {
@@ -235,13 +228,10 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
         dU_t[i] = (double *)malloc(seq_len * sizeof(double));
         dW_t[i] = (double *)malloc(hidden_dim * sizeof(double));
         
-        dU_i[i] = (double *)malloc(seq_len * sizeof(double));
-        dW_i[i] = (double *)malloc(hidden_dim * sizeof(double));
     }
     
     for (int i = 0; i < output_dim; i++) {
         dV[i] = (double *)malloc(hidden_dim * sizeof(double));
-        dV_t[i] = (double *)malloc(hidden_dim * sizeof(double));
     }
 
     for (int i = 0; i < hidden_dim; i++) {
@@ -253,14 +243,12 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
         for (int j = 0; j < hidden_dim; j++) {
             dW[i][j] = 0.0;
             dW_t[i][j] = 0.0;
-            dW_i[i][j] = 0.0;
         }
     }
 
     for (int i = 0; i < output_dim; i++) {
         for (int j = 0; j < hidden_dim; j++) {
-            dV[i][j] = 0.0;
-            dV_t[i][j] = 0.0;
+            dV[i][j] = 0.0;;
         }
     }
 
@@ -273,7 +261,7 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
     _sum = **mulu + **mulw;
 
     double **dsv = (double **)malloc(hidden_dim * sizeof(double *)); 
-    // Produit matriciel entre la transposée de W et dmulw
+
     for (int i = 0; i < hidden_dim; i++) {
         dsv[i] = (double *)malloc(hidden_dim * sizeof(double));
         for (int j = 0; j < hidden_dim; j++) {
@@ -320,32 +308,63 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
 
     for (int timestep = 0; timestep < seq_len; timestep++) {
         
-        *dV_t = 0.0;
-        
-        for (int i = 0; i < hidden_dim; i++) {
-            dV_t[0][i] = 0.0;
+        double **dV_t = (double **)malloc(output_dim * sizeof(double *)); 
+        // Produit matriciel entre la transposée de W et dmulw
+        for (int i = 0; i < output_dim; i++) {
+            dV_t[i] = (double *)malloc(hidden_dim * sizeof(double));
+            for (int j = 0; j < hidden_dim; j++) {
+                dV_t[i][j] = 0;
+                for (int k = 0; k < hidden_dim; k++) {
+                    dV_t[i][j] += layers[timestep]['prev_activation'][k][i] * dmulw[k];
+                }
+            }
         }
-        dV_t = matmul(dmulv, transpose(layers[timestep].activation)); // Assuming matmul() is a function that performs matrix multiplication
-        
+
         double ds = dsv;
 
-        double *dprev_activation = get_previous_activation_differential(_sum, dsv, W);
+        double **dprev_activation = get_previous_activation_differential(_sum, dsv, W);
 
         
         
         for (int k = timestep - 1; k >= fmax(-1, timestep - bptt_truncate - 1); k--) {
+            
             for (int i = 0; i < hidden_dim; i++) {
                 dsv[i] += dprev_activation[i];
             }
-            dprev_activation = get_previous_activation_differential(_sum, dsv, W);
-            dW_i = matmul(W, layers[timestep].prev_activation); // Assuming matmul() is a function that performs matrix multiplication
+
+            double **dprev_activation = get_previous_activation_differential(_sum, dsv, W);
+            
+            double **dW_i = (double **)malloc(hidden_dim * sizeof(double *)); 
+
+            for (int i = 0; i < hidden_dim; i++) {
+                dW_i[i] = (double *)malloc(hidden_dim * sizeof(double));
+                for (int j = 0; j < hidden_dim; j++) {
+                    dW_i[i][j] = 0;
+                    for (int k = 0; k < hidden_dim; k++) {
+                        dW_i[i][j] += W[i][k] * layers[timestep]['prev_activation'][k][i];
+                    }
+                }
+            }
 
             double *new_input = (double *)malloc(seq_len * sizeof(double));
             for (int i = 0; i < seq_len; i++) {
                 new_input[i] = 0.0;
             }
             new_input[timestep] = x[timestep];
-            dU_i = matmul(U, new_input); // Assuming matmul() is a function that performs matrix multiplication
+
+
+            double **dU_i = (double **)malloc(seq_len * sizeof(double *)); 
+                
+            for (int i = 0; i < seq_len; i++) {
+                dU_i[i] = (double *)malloc(hidden_dim * sizeof(double));
+                for (int j = 0; j < hidden_dim; j++) {
+                    dU_i[i][j] = 0;
+                    for (int k = 0; k < hidden_dim; k++) {
+                        dU_i[i][j] += U[i][k] * new_input[k];
+                    }
+                }
+            }
+
 
             for (int i = 0; i < hidden_dim; i++) {
                 for (int j = 0; j < seq_len; j++) {
@@ -354,15 +373,18 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
                 }
             }
         }
+
         for (int i = 0; i < hidden_dim; i++) {
             for (int j = 0; j < seq_len; j++) {
                 dU[i][j] += dU_t[i][j];
                 dW[i][j] += dW_t[i][j];
             }
         }
+
     }
 
-    // Clipping gradients
+
+    // exploding gradients
     for (int i = 0; i < hidden_dim; i++) {
         for (int j = 0; j < seq_len; j++) {
             if (dU[i][j] > max_clip_val) {
@@ -427,8 +449,7 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
                 prev_activation[j] = 0.0;
             }
             
-            double mulu, mulw, mulv ;
-            layers = calc_layers(x, U, V, W, prev_activation, &mulu,&mulw, &mulv);
+            layers = calc_layers(x, U, V, W, prev_activation);
 
             // difference of the prediction
             double **dmulv = (double **)malloc(hidden_dim * sizeof(double *));
@@ -439,8 +460,7 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
             }
 
             // Perform backpropagation and get weight updates
-            double dU, dV, dW;
-            backprop(x, U, V, W, dmulv, mulu, mulw, layers, &dU, &dV, &dW);
+            backprop(x, U, V, W, dmulv, mulu, mulw, layers);
 
             // Update weights
             for (int j = 0; j < hidden_dim; j++) {

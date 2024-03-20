@@ -692,8 +692,8 @@ int main () {
     }
 
 
-    //double rmse = mean_squared_error(Y_validation, val_predictions, size);
-
+    //double mse = mean_squared_error(Y_validation, val_predictions, size);
+    //double rmse = sqrt(mse);
     // Affichage du RMSE
     //printf("%f\n", rmse);
     

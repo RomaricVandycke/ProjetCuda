@@ -47,7 +47,7 @@ __global__ void multmat_kernel_cuda(const basetype *const mA,
 }
 
 // Fonction pour la multiplication de matrices sur le GPU
-void multmat_GPU(const basetype arrayA[], const basetype arrayB[], 
+__global__ void multmat_GPU(const basetype arrayA[], const basetype arrayB[], 
       basetype arrayR[], const unsigned int n, 
       const unsigned int blk_size, 
       resnfo *const start, resnfo *const end)

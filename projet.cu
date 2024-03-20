@@ -290,14 +290,16 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
         }
 
 
-        double result = 0.0;
+        double **result = (double **)malloc(hidden_dim * sizeof(double *)); ;
         // Produit matriciel entre la transposée de W et dmulw
         for (int i = 0; i < hidden_dim; i++) {
-            double som = 0.0;
+            result[i] = (double *)malloc(hidden_dim * sizeof(double));
             for (int j = 0; j < hidden_dim; j++) {
-                som += W[j][i] * dmulw[j];
+                result[i][j] = 0;
+                for (int k = 0; k < hidden_dim; k++) {
+                    result[i][j] += W[k][i] * dmulw[k];
+                }
             }
-            result += som;
         }
 
         return result;
@@ -537,34 +539,31 @@ int main () {
         Y_validation[i - num_records + seq_len][0] = sin_wave[i + seq_len];
     }
 
-    double **U, **V, **W;
 
-    // Allocate memory for weights
+    srand(12161);
+  
+    double **U;
     U = (double **)malloc(hidden_dim * sizeof(double *));
-    V = (double **)malloc(output_dim * sizeof(double *));
-    W = (double **)malloc(hidden_dim * sizeof(double *));
-
     for (int i = 0; i < hidden_dim; i++) {
         U[i] = (double *)malloc(seq_len * sizeof(double));
-        W[i] = (double *)malloc(hidden_dim * sizeof(double));
-    }
-    for (int i = 0; i < output_dim; i++) {
-        V[i] = (double *)malloc(hidden_dim * sizeof(double));
-    }
-
-    // Initialize weights randomly
-    srand(12161);
-    for (int i = 0; i < hidden_dim; i++) {
         for (int j = 0; j < seq_len; j++) {
             U[i][j] = (double)rand() / RAND_MAX;
         }
     }
+    
+    double **V;
+    V = (double **)malloc(output_dim * sizeof(double *));
     for (int i = 0; i < output_dim; i++) {
+        V[i] = (double *)malloc(hidden_dim * sizeof(double));
         for (int j = 0; j < hidden_dim; j++) {
             V[i][j] = (double)rand() / RAND_MAX;
         }
     }
+
+    double **W;
+    W = (double **)malloc(hidden_dim * sizeof(double *));
     for (int i = 0; i < hidden_dim; i++) {
+        W[i] = (double *)malloc(hidden_dim * sizeof(double));
         for (int j = 0; j < hidden_dim; j++) {
             W[i][j] = (double)rand() / RAND_MAX;
         }

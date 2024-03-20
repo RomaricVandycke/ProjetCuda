@@ -28,7 +28,7 @@ double mean_squared_error(double *y_true, double *y_pred, int len) {
 }
 
 
-double calculate_loss(double **X, double **Y, double **U, double **V, double **W, double *loss, double *preactivation) {
+double calculate_loss(double **X, double **Y, double **U, double **V, double **W, double *loss_, double *activation_) {
 
     double loss = 0.0;
 
@@ -110,8 +110,9 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
         }
     }
  
-    *loss = loss;
-    *preactivation = activation;
+    *loss_ = loss;
+    *activation_ = activation;
+    
 
     return 0;
 }
@@ -395,11 +396,11 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
         // calculate initial loss, ie what the output is given a random set of weights
         //double loss, double val_loss  = calculate_loss(X, Y, U, V, W);
         //double val_loss = calculate_loss(X_validation, Y_validation, U, V, W);
-        double loss,preactivation;
-        calculate_loss(X, Y, U, V, W, &loss, &preactivation);
+        double loss_training,preactivation_training;
+        calculate_loss(X, Y, U, V, W, &loss_training, &preactivation_training);
         
-        double val_loss , _ ;
-        calculate_loss(X, Y, U, V, W, &val_loss, &_);
+        double loss_validation , _ ;
+        calculate_loss(X_validation, Y_validation, U, V, W, &loss_validation, &_);
         //double loss, val_loss;
         //loss, val_loss = calculate_loss(X, Y, U, V, W);
 
@@ -501,15 +502,14 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
 int main () {
 
     double sin_wave[200];
-    double **X, **Y, **X_validation, **Y_validation;
 
-    // Generate sin wave data
     for (int i = 0; i < 200; i++) {
         sin_wave[i] = sin(i);
     }
 
     // Allocate memory for training data
     int num_records = 200 - seq_len;
+    double **X, **Y;
 
     X = (double **)malloc(num_records * sizeof(double *));
     Y = (double **)malloc(num_records * sizeof(double *));
@@ -525,6 +525,7 @@ int main () {
         Y[i][0] = sin_wave[i + seq_len];
     }
 
+    double  **X_validation, **Y_validation;
     // Allocate memory for validation data
     X_validation = (double **)malloc(50 * sizeof(double *));
     Y_validation = (double **)malloc(50 * sizeof(double *));
@@ -571,7 +572,7 @@ int main () {
 
     // Train the RNN
     
-    U,V,W = train(U, V, W, X, Y, X_validation, Y_validation);
+    train(U, V, W, X, Y, X_validation, Y_validation);
 
     return 0;
 };

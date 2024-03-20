@@ -276,13 +276,35 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
 
     double *get_previous_activation_differential(double _sum, double *ds, double **W) {
         double *d_sum = (double *)malloc(hidden_dim * sizeof(double));
+        
         for (int i = 0; i < hidden_dim; i++) {
             d_sum[i] = _sum * (1 - _sum) * ds[i];
         }
         double *dmulw = (double *)malloc(hidden_dim * sizeof(double));
+        
         for (int i = 0; i < hidden_dim; i++) {
             dmulw[i] = d_sum[i] * 1.0; // Ici, l'opération `np.ones_like(ds)` en Python est remplacée par 1.0 en C, car il
         }
+
+         // Calcul de la transposée de W
+        double **transposed_W = (double **)malloc(hidden_dim * sizeof(double *));
+        for (int i = 0; i < hidden_dim; i++) {
+            transposed_W[i] = (double *)malloc(hidden_dim * sizeof(double));
+            for (int j = 0; j < hidden_dim; j++) {
+                transposed_W[i][j] = W[j][i];
+            }
+        }
+
+        // Produit matriciel entre la transposée de W et dmulw
+        for (int i = 0; i < hidden_dim; i++) {
+            double sum = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                sum += transposed_W[i][j] * dmulw[j];
+            }
+            result[i] = sum;
+        }
+
+        return result;
     }
 
 

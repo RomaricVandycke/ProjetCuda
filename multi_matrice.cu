@@ -55,7 +55,8 @@ __global__ void multmat_kernel_cuda(const basetype *const mA,
 void multmat_GPU(const basetype arrayA[], const basetype arrayB[], 
       basetype arrayR[], const unsigned int n, 
       const unsigned int blk_size, 
-      resnfo *const start, resnfo *const end)
+      struct timespec *const start, struct timespec *const end)
+
 {
     // Número de bytes de cada uno de nuestros vectores
     unsigned int numBytes = n * n* sizeof(basetype);

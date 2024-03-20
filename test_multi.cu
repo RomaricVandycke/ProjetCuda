@@ -12,7 +12,7 @@ __global__ void matrixMultiplication(int *a, int *b, int *c, int n) {
     if (row < n && col < n) {
         int sum = 0;
         for (int i = 0; i < n; ++i) {
-            sum += a[row * n + i] * b[i * n + col];
+            sum += a[row * n + i] * b[i + col * n]; // Correction de l'indice
         }
         c[row * n + col] = sum;
     }

@@ -239,8 +239,8 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
     }
     
     for (int i = 0; i < output_dim; i++) {
-    *dV = (double *)malloc(hidden_dim * sizeof(double));
-    *dV_t = (double *)malloc(hidden_dim * sizeof(double));
+        dV[i] = (double *)malloc(hidden_dim * sizeof(double));
+        dV_t[i] = (double *)malloc(hidden_dim * sizeof(double));
     }
 
     for (int i = 0; i < hidden_dim; i++) {
@@ -275,33 +275,29 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
     dsv = (double *)malloc(hidden_dim * sizeof(double));
 
     double *get_previous_activation_differential(double _sum, double *ds, double **W) {
+        
         double *d_sum = (double *)malloc(hidden_dim * sizeof(double));
         
         for (int i = 0; i < hidden_dim; i++) {
             d_sum[i] = _sum * (1 - _sum) * ds[i];
         }
+
+
         double *dmulw = (double *)malloc(hidden_dim * sizeof(double));
         
         for (int i = 0; i < hidden_dim; i++) {
             dmulw[i] = d_sum[i] * 1.0; // Ici, l'opération `np.ones_like(ds)` en Python est remplacée par 1.0 en C, car il
         }
 
-         // Calcul de la transposée de W
-        double **transposed_W = (double **)malloc(hidden_dim * sizeof(double *));
-        for (int i = 0; i < hidden_dim; i++) {
-            transposed_W[i] = (double *)malloc(hidden_dim * sizeof(double));
-            for (int j = 0; j < hidden_dim; j++) {
-                transposed_W[i][j] = W[j][i];
-            }
-        }
 
+        double result = 0.0;
         // Produit matriciel entre la transposée de W et dmulw
         for (int i = 0; i < hidden_dim; i++) {
-            double sum = 0.0;
+            double som = 0.0;
             for (int j = 0; j < hidden_dim; j++) {
-                sum += transposed_W[i][j] * dmulw[j];
+                som += W[j][i] * dmulw[j];
             }
-            result[i] = sum;
+            result += som;
         }
 
         return result;
@@ -310,16 +306,20 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
 
 
     for (int timestep = 0; timestep < seq_len; timestep++) {
+        
         *dV_t = 0.0;
+        
         for (int i = 0; i < hidden_dim; i++) {
             dV_t[0][i] = 0.0;
         }
         dV_t = matmul(dmulv, transpose(layers[timestep].activation)); // Assuming matmul() is a function that performs matrix multiplication
-        for (int i = 0; i < hidden_dim; i++) {
-            dsv[i] = dmulv[0] * layers[timestep].activation[i];
-        }
+        
+        double ds = dsv;
+
         double *dprev_activation = get_previous_activation_differential(_sum, dsv, W);
 
+        
+        
         for (int k = timestep - 1; k >= fmax(-1, timestep - bptt_truncate - 1); k--) {
             for (int i = 0; i < hidden_dim; i++) {
                 dsv[i] += dprev_activation[i];

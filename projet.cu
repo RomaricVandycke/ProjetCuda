@@ -22,7 +22,7 @@ double mean_squared_error(double *y_true, double *y_pred, int len) {
     double mse = 0.0;
     for (int i = 0; i < len; i++) {
         double error = y_true[i] - y_pred[i];
-        mse += error * error;   
+        mse += error * error;       
     }
     return mse / len;
 }
@@ -58,7 +58,6 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
             double *mulw = (double *)malloc(hidden_dim * sizeof(double));
 
 
-            // Compute mulu
             for (int k = 0; k < hidden_dim; k++) {
                 mulu[k] = 0.0;
                 for (int l = 0; l < seq_len; l++) {
@@ -66,7 +65,6 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
                 }
             }
 
-            // Compute mulw
             for (int k = 0; k < hidden_dim; k++) {
                 mulw[k] = 0.0;
                 for (int l = 0; l < hidden_dim; l++) {
@@ -76,7 +74,6 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
 
             double _sum = 0.0;
 
-            // Compute _sum
             for (int k = 0; k < hidden_dim; k++) {
                 _sum += mulu[k] + mulw[k];
             }
@@ -90,7 +87,6 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
 
             double *mulv = (double *)malloc(output_dim * sizeof(double));
 
-            // Compute mulv
             for (int k = 0; k < output_dim; k++) {
                 mulv[k] = 0.0;
                 for (int l = 0; l < hidden_dim; l++) {
@@ -98,12 +94,10 @@ double calculate_loss(double **X, double **Y, double **U, double **V, double **W
                 }
             }
 
-             // Update prev_activation for the next timestep
             for (int k = 0; k < hidden_dim; k++) {
                 prev_activation[k] = activation[k];
             }
 
-         // Calculate and add loss per record
         double loss_per_record = (y - mulv[0]) * (y - mulv[0]) / 2.0;
         loss += loss_per_record;
 
@@ -143,7 +137,6 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
         new_input[timestep] = x[timestep];
 
 
-        // Compute mulu
         for (int k = 0; k < hidden_dim; k++) {
             mulu[k] = 0.0;
             for (int l = 0; l < seq_len; l++) {
@@ -151,7 +144,6 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
             }
         }
 
-        // Compute mulw
         for (int k = 0; k < hidden_dim; k++) {
             mulw[k] = 0.0;
             for (int l = 0; l < hidden_dim; l++) {
@@ -161,7 +153,6 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
 
         double _sum = 0.0;
 
-        // Compute _sum
         for (int k = 0; k < hidden_dim; k++) {
             _sum += mulu[k] + mulw[k];
         }
@@ -174,7 +165,6 @@ Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_
 
         double *mulv = (double *)malloc(output_dim * sizeof(double));
 
-        // Compute mulv
         for (int k = 0; k < output_dim; k++) {
             mulv[k] = 0.0;
             for (int l = 0; l < hidden_dim; l++) {
@@ -285,7 +275,7 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
         double *dmulw = (double *)malloc(hidden_dim * sizeof(double));
         
         for (int i = 0; i < hidden_dim; i++) {
-            dmulw[i] = d_sum[i] * 1.0; // Ici, l'opération `np.ones_like(ds)` en Python est remplacée par 1.0 en C, car il
+            dmulw[i] = d_sum[i] * 1.0; // Ici, l'opération `np.ones_like(ds)` en Python est remplacée par 1.0 en C
         }
 
 
@@ -309,7 +299,6 @@ double **backprop(double **x, double **U, double **V, double **W, double *dmulv,
     for (int timestep = 0; timestep < seq_len; timestep++) {
         
         double **dV_t = (double **)malloc(output_dim * sizeof(double *)); 
-        // Produit matriciel entre la transposée de W et dmulw
         for (int i = 0; i < output_dim; i++) {
             dV_t[i] = (double *)malloc(hidden_dim * sizeof(double));
             for (int j = 0; j < hidden_dim; j++) {
@@ -426,21 +415,17 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
     
 
     for (int epoch = 0; epoch < max_epochs; epoch++) {
-        // calculate initial loss, ie what the output is given a random set of weights
-        //double loss, double val_loss  = calculate_loss(X, Y, U, V, W);
-        //double val_loss = calculate_loss(X_validation, Y_validation, U, V, W);
+       
         double loss_training,preactivation_training;
         calculate_loss(X, Y, U, V, W, &loss_training, &preactivation_training);
         
         double loss_validation , _ ;
         calculate_loss(X_validation, Y_validation, U, V, W, &loss_validation, &_);
-        //double loss, val_loss;
-        //loss, val_loss = calculate_loss(X, Y, U, V, W);
 
 
         printf("Epoch: %d, Loss: %f, Validation Loss: %f\n", epoch+1, loss, val_loss);
 
-        // train model/forward pass
+
         for (int i = 0; i < Y.shape[0]; i++) {
             double **x = X[i];
             double **y = Y[i];
@@ -452,7 +437,7 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
             
             layers = calc_layers(x, U, V, W, prev_activation);
 
-            // difference of the prediction
+
             double **dmulv = (double **)malloc(hidden_dim * sizeof(double *));
 
             for (int j = 0; j < hidden_dim; j++) {
@@ -460,10 +445,10 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
                 dmulv[j][0] = mulv[j][0] - y[j][0];
             }
 
-            // Perform backpropagation and get weight updates
+
             backprop(x, U, V, W, dmulv, mulu, mulw, layers);
 
-            // Update weights
+
             for (int j = 0; j < hidden_dim; j++) {
                 for (int k = 0; k < seq_len; k++) {
                     U[j][k] -= learning_rate * dU[j][k];
@@ -476,7 +461,7 @@ double **train(double **U, double **V, double **W, double **X, double **Y, doubl
         }
     }
 
-    return 0; // Retourne les poids mis à jour
+    return 0; 
 }
 
 
@@ -494,7 +479,6 @@ int main () {
         sin_wave[i] = sin(i);
     }
 
-    // Allocate memory for training data
     int num_records = 200 - seq_len;
     double **X, **Y;
 
@@ -513,7 +497,7 @@ int main () {
     }
 
     double  **X_validation, **Y_validation;
-    // Allocate memory for validation data
+
     X_validation = (double **)malloc(50 * sizeof(double *));
     Y_validation = (double **)malloc(50 * sizeof(double *));
 
@@ -564,7 +548,103 @@ int main () {
 
 
 
-   //predictions
+   //predictions on the training set
+
+   double **predictions = (double **)malloc(num_records * sizeof(double *));
+   for (int i = 0; i < num_records; i++) {
+        predictions[i] = (double *)malloc(output_dim * sizeof(double));
+   }
+
+    for (int i = 0; i < num_records; i++) {
+        double *x = X[i];
+        double y = Y[i][0];
+        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
+        for (int i = 0; i < hidden_dim; i++) {
+            prev_activation[i] = 0.0;
+        }
+        //memset(prev_activation, 0, hidden_dim * sizeof(double)); // Initialisation à zéro
+
+        for (int timestep = 0; timestep < seq_len; timestep++) {
+
+            double mulu = 0.0;
+            for (int j = 0; j < seq_len; j++) {
+                mulu += U[j][i] * x[j];
+            }
+        
+            double mulw = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                mulw += W[j][i] * prev_activation[j];
+            }
+        
+            double _sum = mulu + mulw;
+        
+            double activation = sigmoid(_sum);
+        
+            double mulv = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                mulv += V[j][i] * activation;
+            }
+        
+            for (int j = 0; j < hidden_dim; j++) {
+            prev_activation[j] = activation;
+            }
+        }
+
+        for (int j = 0; j < output_dim; j++) {
+            predictions[i][j] = mulv;
+        }
+    }
+
+
+   //predictions on the training set
+
+   double **predictions = (double **)malloc(num_records * sizeof(double *));
+   for (int i = 0; i < num_records; i++) {
+        predictions[i] = (double *)malloc(output_dim * sizeof(double));
+   }
+
+    for (int i = 0; i < num_records; i++) {
+        double *x = X[i];
+        double y = Y[i][0];
+        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
+        for (int i = 0; i < hidden_dim; i++) {
+            prev_activation[i] = 0.0;
+        }
+        //memset(prev_activation, 0, hidden_dim * sizeof(double)); // Initialisation à zéro
+
+        for (int timestep = 0; timestep < seq_len; timestep++) {
+
+            double mulu = 0.0;
+            for (int j = 0; j < seq_len; j++) {
+                mulu += U[j][i] * x[j];
+            }
+        
+            double mulw = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                mulw += W[j][i] * prev_activation[j];
+            }
+        
+            double _sum = mulu + mulw;
+        
+            double activation = sigmoid(_sum);
+        
+            double mulv = 0.0;
+            for (int j = 0; j < hidden_dim; j++) {
+                mulv += V[j][i] * activation;
+            }
+        
+            for (int j = 0; j < hidden_dim; j++) {
+            prev_activation[j] = activation;
+            }
+        }
+
+        for (int j = 0; j < output_dim; j++) {
+            predictions[i][j] = mulv;
+        }
+   }
+
+
+   //predictions on the validation set
 
    double **val_predictions = (double **)malloc(num_records * sizeof(double *));
    for (int i = 0; i < num_records; i++) {
@@ -612,6 +692,11 @@ int main () {
     }
 
 
+    //double rmse = mean_squared_error(Y_validation, val_predictions, size);
 
+    // Affichage du RMSE
+    //printf("%f\n", rmse);
+    
     return 0;
+
 };

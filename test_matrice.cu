@@ -115,3 +115,4 @@ int main(int argc, char **argv) {
     free(matriceRight);
     free(matriceLeft);
     return 0;
+}

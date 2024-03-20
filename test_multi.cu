@@ -12,7 +12,7 @@ __global__ void matrixMultiplication(int *a, int *b, int *c, int n) {
     if (row < n && col < n) {
         int sum = 0;
         for (int i = 0; i < n; ++i) {
-            sum += a[row * n + i] * b[i + col * n]; // Correction de l'indice
+            sum += a[row * n + i] * b[i + col * n];
         }
         c[row * n + col] = sum;
     }
@@ -23,9 +23,25 @@ int main() {
     int *d_a, *d_b, *d_c; // Device matrices
 
     // Allocation mémoire pour les matrices sur le device
-    cudaMalloc((void**)&d_a, N * N * sizeof(int));
-    cudaMalloc((void**)&d_b, N * N * sizeof(int));
-    cudaMalloc((void**)&d_c, N * N * sizeof(int));
+    cudaError_t cudaStatus;
+    cudaStatus = cudaMalloc((void**)&d_a, N * N * sizeof(int));
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erreur lors de l'allocation de mémoire pour d_a: %s\n", cudaGetErrorString(cudaStatus));
+        return -1;
+    }
+    cudaStatus = cudaMalloc((void**)&d_b, N * N * sizeof(int));
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erreur lors de l'allocation de mémoire pour d_b: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_a);
+        return -1;
+    }
+    cudaStatus = cudaMalloc((void**)&d_c, N * N * sizeof(int));
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erreur lors de l'allocation de mémoire pour d_c: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_a);
+        cudaFree(d_b);
+        return -1;
+    }
 
     // Allocation mémoire pour les matrices sur l'hôte
     a = (int*)malloc(N * N * sizeof(int));
@@ -40,8 +56,22 @@ int main() {
     }
 
     // Copie des données des matrices de l'hôte au device
-    cudaMemcpy(d_a, a, N * N * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, b, N * N * sizeof(int), cudaMemcpyHostToDevice);
+    cudaStatus = cudaMemcpy(d_a, a, N * N * sizeof(int), cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erreur lors de la copie des données de a au device: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_a);
+        cudaFree(d_b);
+        cudaFree(d_c);
+        return -1;
+    }
+    cudaStatus = cudaMemcpy(d_b, b, N * N * sizeof(int), cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erreur lors de la copie des données de b au device: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_a);
+        cudaFree(d_b);
+        cudaFree(d_c);
+        return -1;
+    }
 
     // Configuration des dimensions de la grille et du bloc
     dim3 threadsPerBlock(16, 16);
@@ -52,7 +82,14 @@ int main() {
     matrixMultiplication<<<numBlocks, threadsPerBlock>>>(d_a, d_b, d_c, N);
 
     // Copie du résultat de la multiplication du device à l'hôte
-    cudaMemcpy(c, d_c, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaStatus = cudaMemcpy(c, d_c, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erreur lors de la copie du résultat de c au host: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_a);
+        cudaFree(d_b);
+        cudaFree(d_c);
+        return -1;
+    }
 
     // Affichage du résultat
     printf("Matrix A:\n");

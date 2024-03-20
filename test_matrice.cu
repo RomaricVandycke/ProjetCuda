@@ -44,9 +44,9 @@ void matrixMulOnDevice(float *matriceResult, float *matriceLeft, float *matriceR
     // Allocation de la matrice de résultat
     cudaMalloc(&globalVarMatrix.matriceResultd, size);
     // Multiplication d'une seule matrice
-    dim3 dimGrid(1, 1);
+    // dim3 dimGrid(1, 1);
     // Matrice carrée
-    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+    // dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     // Produit matriciel proprement dit
     matrixMulKernel<<<1, 1>>>(globalVarMatrix.matriceResultd, globalVarMatrix.matriceLeftd, globalVarMatrix.matriceRightd, width);
     // Récupération du résultat du calcul

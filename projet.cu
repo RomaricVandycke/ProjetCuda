@@ -194,7 +194,7 @@ void rnnsetstart(RNN * net, double *input_matrix, double *output_matrix, double 
     dim3 gridSize((k + blockSize.x - 1) / blockSize.x, (m + blockSize.y - 1) / blockSize.y);
 
     // Launch the kernel
-    matrixMultiplicationKernel<<<gridSize, blockSize>>>(d_input, d_weight, d_output, m, n, k);
+    matrixMultiplicationKernel<<<gridSize, blockSize>>>(d_input, d_weight, d_output, m);
 
     // Copy the result back to host memory
     cudaMemcpy(output_matrix, d_output, size_in_bytes, cudaMemcpyDeviceToHost);

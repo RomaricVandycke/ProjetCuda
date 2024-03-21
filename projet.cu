@@ -180,11 +180,12 @@ void rnnget(RNN * net, double * out) {
   for(i=net->nbneurons-1; i>=(net->nbneurons - net->layersize[net->layersize[0]]); i--) { out[k] = net->n[i].value; k++; }
 }
 
-void rnnsetstart(RNN * net, double *input_matrix, double *output_matrix, double *d_weight, int m, int n, int k, size_t size_in_bytes) {
+void rnnsetstart(RNN * net) {
     // Allocate device memory for input and output matrices
-    double *d_input, *d_output;
+    double *d_input, *d_output, *d_weight;
     cudaMalloc(&d_input, size_in_bytes);  // Allocate memory for input matrix
     cudaMalloc(&d_output, size_in_bytes); // Allocate memory for output matrix
+    cudaMalloc(&d_weight, weight_size_in_bytes); // Allocate memory for weight matrix
 
     // Copy input matrix to device memory
     cudaMemcpy(d_input, input_matrix, size_in_bytes, cudaMemcpyHostToDevice);
@@ -202,7 +203,9 @@ void rnnsetstart(RNN * net, double *input_matrix, double *output_matrix, double 
     // Free device memory
     cudaFree(d_input);
     cudaFree(d_output);
+    cudaFree(d_weight);
 }
+
 
 void rnnset(RNN * net, double * in) {
   int i,j,k;

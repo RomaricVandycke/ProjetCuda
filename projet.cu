@@ -53,6 +53,7 @@ struct _config {
   int * synapses;
 };
 
+
 CONFIG * createconfig(int * layersize) {
   CONFIG * conf = (CONFIG*)malloc(sizeof(CONFIG));
   int i;
@@ -180,16 +181,27 @@ void rnnget(RNN * net, double * out) {
 }
 
 void rnnsetstart(RNN * net) {
-  int i,j;
+    // Allocate device memory for input and output matrices
+    double *d_input, *d_output;
+    cudaMalloc(&d_input, size_in_bytes);  // Allocate memory for input matrix
+    cudaMalloc(&d_output, size_in_bytes); // Allocate memory for output matrix
 
-  NEURON *ni,*nj;
-  // For each neuron, update value_prev:
-  for(i=0; i<net->nbneurons; i++) {
-    ni = &(net->n[i]);
-    // If NOT the output layer, then the value is already computed by tanh:
-    if(ni->layer != net->layersize[0]-1) ni->value_prev = ni->value;
-    else ni->value_prev = tanh(ni->value);
-  }
+    // Copy input matrix to device memory
+    cudaMemcpy(d_input, input_matrix, size_in_bytes, cudaMemcpyHostToDevice);
+
+    // Define grid and block dimensions
+    dim3 blockSize(16, 16);
+    dim3 gridSize((k + blockSize.x - 1) / blockSize.x, (m + blockSize.y - 1) / blockSize.y);
+
+    // Launch the kernel
+    matrixMultiplicationKernel<<<gridSize, blockSize>>>(d_input, d_weight, d_output, m, n, k);
+
+    // Copy the result back to host memory
+    cudaMemcpy(output_matrix, d_output, size_in_bytes, cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_input);
+    cudaFree(d_output);
 }
 
 void rnnset(RNN * net, double * in) {
@@ -367,3 +379,4 @@ int main() {
     freernn(netrnn);
     
     return 0;
+}

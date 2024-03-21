@@ -7,7 +7,7 @@
 #include "mlp.h"
 
 // Kernel pour la multiplication de matrices
-__global__ void matrixMultiplication(int *a, int *b, int *c, int n) {
+__global__ void matrixMultiplicationKernel(double *input_matrix, double *d_weight, double *output_matrix, int m, int n, int k) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     
@@ -332,9 +332,9 @@ int main() {
     // Déclarations des variables pour les matrices et les poids
     float *input_matrix, *output_matrix, *d_weight;
     int k, m, n;
-    size_t taille_input_matrix = /* taille en octets */;
-    size_t taille_output_matrix = /* taille en octets */;
-    size_t taille_d_weight = /* taille en octets */;
+    size_t taille_input_matrix = 16;
+    size_t taille_output_matrix = 16;
+    size_t taille_d_weight = 16;
 
     // Allocation de mémoire pour les matrices et les poids sur le GPU
     cudaMalloc((void**)&input_matrix, taille_input_matrix);

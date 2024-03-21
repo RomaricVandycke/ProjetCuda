@@ -7,7 +7,7 @@
 #include "mlp.h"
 
 // Kernel pour la multiplication de matrices
-__global__ void matrixMultiplicationKernel(double *input_matrix, double *d_weight, double *output_matrix, int m, int n, int k) {
+__global__ void matrixMultiplicationKernel((int *a, int *b, int *c, int n)) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     

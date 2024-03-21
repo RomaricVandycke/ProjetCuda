@@ -1,702 +1,369 @@
-#include <math.h>
 #include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <malloc.h>
 #include <stdlib.h>
 
-float learning_rate = 0.0001;
-int seq_len = 50;
-int max_epochs = 25;
-int hidden_dim = 100;
-int output_dim = 1;
-int bptt_truncate = 5;
-int min_clip_val = -10;
-int max_clip_val = 10;
+#include "mlp.h"
 
+// Kernel pour la multiplication de matrices
+__global__ void matrixMultiplication(int *a, int *b, int *c, int n) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < n && col < n) {
+        int sum = 0;
+        for (int i = 0; i < n; ++i) {
+            sum += a[row * n + i] * b[i + col * n];
+        }
+        c[row * n + col] = sum;
+    }
+}
 
+typedef struct _neuron NEURON;
+struct _neuron {
+  int layer;
 
-double sigmoid(float x){
-	return 1/(1+exp(-x))
+  double * weight;      // table of weights for incoming synapses
+  int nbsynapsesin;     // number of incoming synapses
+
+  NEURON ** synapsesin; // table of pointer to the neurons from
+                        // which are coming the synapses
+  double bias;
+
+  double value;
+  double value_prev;
+  double error;
+  double error_prev;
 };
 
-
-double mean_squared_error(double *y_true, double *y_pred, int len) {
-    double mse = 0.0;
-    for (int i = 0; i < len; i++) {
-        double error = y_true[i] - y_pred[i];
-        mse += error * error;       
-    }
-    return mse / len;
-}
-
-
-double calculate_loss(double **X, double **Y, double **U, double **V, double **W, double *loss_, double *activation_) {
-
-    double loss = 0.0;
-
-    for (int i = 0; i < num_records; i++) { //
-
-        double *x = X[i];
-        double *y = Y[i];
-
-        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
-
-        for (int j = 0; j < hidden_dim; j++) {
-            prev_activation[j] = 0.0;
-        }
-
-        for (int timestep = 0; timestep < seq_len; timestep++) {
-
-            double *new_input = (double *)malloc(seq_len * sizeof(double));
-
-            for (int k = 0; k < seq_len; k++) {
-                new_input[k] = 0.0;
-            }
-
-            new_input[timestep] = x[timestep];
-
-
-            double *mulu = (double *)malloc(hidden_dim * sizeof(double));
-            double *mulw = (double *)malloc(hidden_dim * sizeof(double));
-
-
-            for (int k = 0; k < hidden_dim; k++) {
-                mulu[k] = 0.0;
-                for (int l = 0; l < seq_len; l++) {
-                    mulu[k] += U[k][l] * new_input[l];
-                }
-            }
-
-            for (int k = 0; k < hidden_dim; k++) {
-                mulw[k] = 0.0;
-                for (int l = 0; l < hidden_dim; l++) {
-                    mulw[k] += W[k][l] * prev_activation[l];
-                }
-            }
-
-            double _sum = 0.0;
-
-            for (int k = 0; k < hidden_dim; k++) {
-                _sum += mulu[k] + mulw[k];
-            }
-
-            
-            double activation[hidden_dim];
-
-            for (int k = 0; k < hidden_dim; k++) {
-                activation[k] = sigmoid(_sum);
-            }
-
-            double *mulv = (double *)malloc(output_dim * sizeof(double));
-
-            for (int k = 0; k < output_dim; k++) {
-                mulv[k] = 0.0;
-                for (int l = 0; l < hidden_dim; l++) {
-                    mulv[k] += V[k][l] * activation[l];
-                }
-            }
-
-            for (int k = 0; k < hidden_dim; k++) {
-                prev_activation[k] = activation[k];
-            }
-
-        double loss_per_record = (y - mulv[0]) * (y - mulv[0]) / 2.0;
-        loss += loss_per_record;
-
-        }
-    }
- 
-    *loss_ = loss;
-    *activation_ = activation;
-
-
-    return 0;
-}
-
-
-
-typedef struct {
-    double *activation;
-    double *prev_activation;
-} Layer;
-
-
-Layer *calc_layers(double **x, double **U, double **V, double **W, double *prev_activation) {
-    
-	Layer *layers = (Layer *)malloc(seq_len * sizeof(Layer));
-    
-    double *mulu = (double *)malloc(hidden_dim * sizeof(double));
-    double *mulv = (double *)malloc(output_dim * sizeof(double));
-    double *mulw = (double *)malloc(hidden_dim * sizeof(double));
-
-    for (int timestep = 0; timestep < seq_len; timestep++) {
-
-        double *new_input = (double *)malloc(seq_len * sizeof(double));
-        for (int k = 0; k < seq_len; k++) {
-            new_input[k] = 0.0;
-        }
-
-        new_input[timestep] = x[timestep];
-
-
-        for (int k = 0; k < hidden_dim; k++) {
-            mulu[k] = 0.0;
-            for (int l = 0; l < seq_len; l++) {
-                mulu[k] += U[k][l] * new_input[l];
-            }
-        }
-
-        for (int k = 0; k < hidden_dim; k++) {
-            mulw[k] = 0.0;
-            for (int l = 0; l < hidden_dim; l++) {
-                mulw[k] += W[k][l] * prev_activation[l];
-            }
-        }
-
-        double _sum = 0.0;
-
-        for (int k = 0; k < hidden_dim; k++) {
-            _sum += mulu[k] + mulw[k];
-        }
-
-            
-        double activation[hidden_dim];
-        for (int k = 0; k < hidden_dim; k++) {
-            activation[k] = sigmoid(_sum);
-        }
-
-        double *mulv = (double *)malloc(output_dim * sizeof(double));
-
-        for (int k = 0; k < output_dim; k++) {
-            mulv[k] = 0.0;
-            for (int l = 0; l < hidden_dim; l++) {
-                mulv[k] += V[k][l] * activation[l];
-            }
-        }
-
-
-        layers[timestep].activation = (double *)malloc(hidden_dim * sizeof(double));
-        layers[timestep].prev_activation = (double *)malloc(hidden_dim * sizeof(double));
-        
-        for (int i = 0; i < hidden_dim; i++) {
-            layers[timestep].activation[i] = activation[i];
-            layers[timestep].prev_activation[i] = prev_activation[i];
-        }
-
-        // Update prev_activation for the next timestep
-        for (int k = 0; k < hidden_dim; k++) {
-            prev_activation[k] = activation[k];
-        }
-
-    }
-
-
-    return layers;
-}
-
-
-
-
-
-
-
-double **backprop(double **x, double **U, double **V, double **W, double *dmulv, double **mulu, double **mulw, Layer *layers) {
-
-
-
-    double **dU = (double **)malloc(hidden_dim * sizeof(double *));
-    double **dV = (double **)malloc(output_dim * sizeof(double *));
-    double **dW = (double **)malloc(hidden_dim * sizeof(double *));
-    
-    double **dU_t = (double **)malloc(hidden_dim * sizeof(double *));
-    double **dW_t = (double **)malloc(hidden_dim * sizeof(double *)); 
-    
-
-
-    for (int i = 0; i < hidden_dim; i++) {
-        dU[i] = (double *)malloc(seq_len * sizeof(double));
-        dW[i] = (double *)malloc(hidden_dim * sizeof(double));
-        
-        dU_t[i] = (double *)malloc(seq_len * sizeof(double));
-        dW_t[i] = (double *)malloc(hidden_dim * sizeof(double));
-        
-    }
-    
-    for (int i = 0; i < output_dim; i++) {
-        dV[i] = (double *)malloc(hidden_dim * sizeof(double));
-    }
-
-    for (int i = 0; i < hidden_dim; i++) {
-        for (int j = 0; j < seq_len; j++) {
-            dU[i][j] = 0.0;
-            dU_t[i][j] = 0.0;
-            dU_i[i][j] = 0.0;
-        }
-        for (int j = 0; j < hidden_dim; j++) {
-            dW[i][j] = 0.0;
-            dW_t[i][j] = 0.0;
-        }
-    }
-
-    for (int i = 0; i < output_dim; i++) {
-        for (int j = 0; j < hidden_dim; j++) {
-            dV[i][j] = 0.0;;
-        }
-    }
-
-
-
-    // Calculation
-
-
-    double _sum;
-    _sum = **mulu + **mulw;
-
-    double **dsv = (double **)malloc(hidden_dim * sizeof(double *)); 
-
-    for (int i = 0; i < hidden_dim; i++) {
-        dsv[i] = (double *)malloc(hidden_dim * sizeof(double));
-        for (int j = 0; j < hidden_dim; j++) {
-            dsv[i][j] = 0;
-            for (int k = 0; k < hidden_dim; k++) {
-                dsv[i][j] += V[k][i] * dmulv[k];
-            }
-        }
-    }
-
-
-    double *get_previous_activation_differential(double _sum, double *ds, double **W) {
-        
-        double *d_sum = (double *)malloc(hidden_dim * sizeof(double));
-        
-        for (int i = 0; i < hidden_dim; i++) {
-            d_sum[i] = _sum * (1 - _sum) * ds[i];
-        }
-
-
-        double *dmulw = (double *)malloc(hidden_dim * sizeof(double));
-        
-        for (int i = 0; i < hidden_dim; i++) {
-            dmulw[i] = d_sum[i] * 1.0; // Ici, l'opération `np.ones_like(ds)` en Python est remplacée par 1.0 en C
-        }
-
-
-        double **result = (double **)malloc(hidden_dim * sizeof(double *)); 
-        // Produit matriciel entre la transposée de W et dmulw
-        for (int i = 0; i < hidden_dim; i++) {
-            result[i] = (double *)malloc(hidden_dim * sizeof(double));
-            for (int j = 0; j < hidden_dim; j++) {
-                result[i][j] = 0;
-                for (int k = 0; k < hidden_dim; k++) {
-                    result[i][j] += W[k][i] * dmulw[k];
-                }
-            }
-        }
-
-        return result;
-    }
-
-
-
-    for (int timestep = 0; timestep < seq_len; timestep++) {
-        
-        double **dV_t = (double **)malloc(output_dim * sizeof(double *)); 
-        for (int i = 0; i < output_dim; i++) {
-            dV_t[i] = (double *)malloc(hidden_dim * sizeof(double));
-            for (int j = 0; j < hidden_dim; j++) {
-                dV_t[i][j] = 0;
-                for (int k = 0; k < hidden_dim; k++) {
-                    dV_t[i][j] += layers[timestep]['prev_activation'][k][i] * dmulw[k];
-                }
-            }
-        }
-
-        double ds = dsv;
-
-        double **dprev_activation = get_previous_activation_differential(_sum, dsv, W);
-
-        
-        
-        for (int k = timestep - 1; k >= fmax(-1, timestep - bptt_truncate - 1); k--) {
-            
-            for (int i = 0; i < hidden_dim; i++) {
-                dsv[i] += dprev_activation[i];
-            }
-
-            double **dprev_activation = get_previous_activation_differential(_sum, dsv, W);
-            
-            double **dW_i = (double **)malloc(hidden_dim * sizeof(double *)); 
-
-            for (int i = 0; i < hidden_dim; i++) {
-                dW_i[i] = (double *)malloc(hidden_dim * sizeof(double));
-                for (int j = 0; j < hidden_dim; j++) {
-                    dW_i[i][j] = 0;
-                    for (int k = 0; k < hidden_dim; k++) {
-                        dW_i[i][j] += W[i][k] * layers[timestep]['prev_activation'][k][i];
-                    }
-                }
-            }
-
-            double *new_input = (double *)malloc(seq_len * sizeof(double));
-            for (int i = 0; i < seq_len; i++) {
-                new_input[i] = 0.0;
-            }
-            new_input[timestep] = x[timestep];
-
-
-            double **dU_i = (double **)malloc(hidden_dim * sizeof(double *)); 
-                
-            for (int i = 0; i < hidden_dim; i++) {
-                dU_i[i] = (double *)malloc(seq_len * sizeof(double));
-                for (int j = 0; j < seq_len; j++) {
-                    dU_i[i][j] = 0;
-                    for (int k = 0; k < seq_len; k++) {
-                        dU_i[i][j] += U[i][k] * new_input[k];
-                    }
-                }
-            }
-
-
-            for (int i = 0; i < hidden_dim; i++) {
-                for (int j = 0; j < seq_len; j++) {
-                    dU_t[i][j] += dU_i[i][j];
-                    dW_t[i][j] += dW_i[i][j];
-                }
-            }
-        }
-
-        for (int i = 0; i < hidden_dim; i++) {
-            for (int j = 0; j < seq_len; j++) {
-                dU[i][j] += dU_t[i][j];
-                dW[i][j] += dW_t[i][j];
-            }
-        }
-
-    }
-
-
-    // exploding gradients
-    for (int i = 0; i < hidden_dim; i++) {
-        for (int j = 0; j < seq_len; j++) {
-            if (dU[i][j] > max_clip_val) {
-                dU[i][j] = max_clip_val;
-            }
-            if (dU[i][j] < min_clip_val) {
-                dU[i][j] = min_clip_val;
-            }
-        }
-        for (int j = 0; j < hidden_dim; j++) {
-            if (dW[i][j] > max_clip_val) {
-                dW[i][j] = max_clip_val;
-            }
-            if (dW[i][j] < min_clip_val) {
-                dW[i][j] = min_clip_val;
-            }
-        }
-    }
-
-    for (int i = 0; i < output_dim; i++) {
-        for (int j = 0; j < hidden_dim; j++){
-            if (dV[i][j] > max_clip_val) {
-                dV[i][j] = max_clip_val;
-            }
-            if (dV[i][j] < min_clip_val) {
-                dV[i][j] = min_clip_val;
-            }
-        }
-    }
-
-    return 0;
-}
-
-
-
-
-
-double **train(double **U, double **V, double **W, double **X, double **Y, double **X_validation, double **Y_validation) {
-    
-
-    for (int epoch = 0; epoch < max_epochs; epoch++) {
-       
-        double loss_training,preactivation_training;
-        calculate_loss(X, Y, U, V, W, &loss_training, &preactivation_training);
-        
-        double loss_validation , _ ;
-        calculate_loss(X_validation, Y_validation, U, V, W, &loss_validation, &_);
-
-
-        printf("Epoch: %d, Loss: %f, Validation Loss: %f\n", epoch+1, loss, val_loss);
-
-
-        for (int i = 0; i < Y.shape[0]; i++) {
-            double **x = X[i];
-            double **y = Y[i];
-
-            double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
-            for (int j = 0; j < hidden_dim; j++) {
-                prev_activation[j] = 0.0;
-            }
-            
-            layers = calc_layers(x, U, V, W, prev_activation);
-
-
-            double **dmulv = (double **)malloc(hidden_dim * sizeof(double *));
-
-            for (int j = 0; j < hidden_dim; j++) {
-                dmulv[j] = (double *)malloc(sizeof(double));
-                dmulv[j][0] = mulv[j][0] - y[j][0];
-            }
-
-
-            backprop(x, U, V, W, dmulv, mulu, mulw, layers);
-
-
-            for (int j = 0; j < hidden_dim; j++) {
-                for (int k = 0; k < seq_len; k++) {
-                    U[j][k] -= learning_rate * dU[j][k];
-                    V[j][k] -= learning_rate * dV[j][k];
-                    W[j][k] -= learning_rate * dW[j][k];
-                }
-            }
-
-
-        }
-    }
-
-    return 0; 
-}
-
-
-
-
-
-
-
-
-int main () {
-
-    double sin_wave[200];
-
-    for (int i = 0; i < 200; i++) {
-        sin_wave[i] = sin(i);
-    }
-
-    int num_records = 200 - seq_len;
-    double **X, **Y;
-
-    X = (double **)malloc(num_records * sizeof(double *));
-    Y = (double **)malloc(num_records * sizeof(double *));
-
-    for (int i = 0; i < num_records - 50; i++) {
-
-        X[i] = (double *)malloc(seq_len * sizeof(double));
-        Y[i] = (double *)malloc(sizeof(double));
-
-        for (int j = 0; j < seq_len; j++) {
-            X[i][j] = sin_wave[i + j];
-        }
-        Y[i][0] = sin_wave[i + seq_len];
-    }
-
-    double  **X_validation, **Y_validation;
-
-    X_validation = (double **)malloc(50 * sizeof(double *));
-    Y_validation = (double **)malloc(50 * sizeof(double *));
-
-    for (int i = num_records - seq_len; i < num_records; i++) {
-        X_validation[i - num_records + seq_len] = (double *)malloc(seq_len * sizeof(double));
-        Y_validation[i - num_records + seq_len] = (double *)malloc(sizeof(double));
-
-        for (int j = 0; j < seq_len; j++) {
-            X_validation[i - num_records + seq_len][j] = sin_wave[i + j];
-        }
-        Y_validation[i - num_records + seq_len][0] = sin_wave[i + seq_len];
-    }
-
-
-    srand(12161);
-  
-    double **U;
-    U = (double **)malloc(hidden_dim * sizeof(double *));
-    for (int i = 0; i < hidden_dim; i++) {
-        U[i] = (double *)malloc(seq_len * sizeof(double));
-        for (int j = 0; j < seq_len; j++) {
-            U[i][j] = (double)rand() / RAND_MAX;
-        }
-    }
-    
-    double **V;
-    V = (double **)malloc(output_dim * sizeof(double *));
-    for (int i = 0; i < output_dim; i++) {
-        V[i] = (double *)malloc(hidden_dim * sizeof(double));
-        for (int j = 0; j < hidden_dim; j++) {
-            V[i][j] = (double)rand() / RAND_MAX;
-        }
-    }
-
-    double **W;
-    W = (double **)malloc(hidden_dim * sizeof(double *));
-    for (int i = 0; i < hidden_dim; i++) {
-        W[i] = (double *)malloc(hidden_dim * sizeof(double));
-        for (int j = 0; j < hidden_dim; j++) {
-            W[i][j] = (double)rand() / RAND_MAX;
-        }
-    }
-
-    // Train the RNN
-    
-    train(U, V, W, X, Y, X_validation, Y_validation);
-
-
-
-
-   //predictions on the training set
-
-   double **predictions = (double **)malloc(num_records * sizeof(double *));
-   for (int i = 0; i < num_records; i++) {
-        predictions[i] = (double *)malloc(output_dim * sizeof(double));
-   }
-
-    for (int i = 0; i < num_records; i++) {
-        double *x = X[i];
-        double y = Y[i][0];
-        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
-        for (int i = 0; i < hidden_dim; i++) {
-            prev_activation[i] = 0.0;
-        }
-        //memset(prev_activation, 0, hidden_dim * sizeof(double)); // Initialisation à zéro
-
-        for (int timestep = 0; timestep < seq_len; timestep++) {
-
-            double mulu = 0.0;
-            for (int j = 0; j < seq_len; j++) {
-                mulu += U[j][i] * x[j];
-            }
-        
-            double mulw = 0.0;
-            for (int j = 0; j < hidden_dim; j++) {
-                mulw += W[j][i] * prev_activation[j];
-            }
-        
-            double _sum = mulu + mulw;
-        
-            double activation = sigmoid(_sum);
-        
-            double mulv = 0.0;
-            for (int j = 0; j < hidden_dim; j++) {
-                mulv += V[j][i] * activation;
-            }
-        
-            for (int j = 0; j < hidden_dim; j++) {
-            prev_activation[j] = activation;
-            }
-        }
-
-        for (int j = 0; j < output_dim; j++) {
-            predictions[i][j] = mulv;
-        }
-    }
-
-
-   //predictions on the training set
-
-   double **predictions = (double **)malloc(num_records * sizeof(double *));
-   for (int i = 0; i < num_records; i++) {
-        predictions[i] = (double *)malloc(output_dim * sizeof(double));
-   }
-
-    for (int i = 0; i < num_records; i++) {
-        double *x = X[i];
-        double y = Y[i][0];
-        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
-        for (int i = 0; i < hidden_dim; i++) {
-            prev_activation[i] = 0.0;
-        }
-        //memset(prev_activation, 0, hidden_dim * sizeof(double)); // Initialisation à zéro
-
-        for (int timestep = 0; timestep < seq_len; timestep++) {
-
-            double mulu = 0.0;
-            for (int j = 0; j < seq_len; j++) {
-                mulu += U[j][i] * x[j];
-            }
-        
-            double mulw = 0.0;
-            for (int j = 0; j < hidden_dim; j++) {
-                mulw += W[j][i] * prev_activation[j];
-            }
-        
-            double _sum = mulu + mulw;
-        
-            double activation = sigmoid(_sum);
-        
-            double mulv = 0.0;
-            for (int j = 0; j < hidden_dim; j++) {
-                mulv += V[j][i] * activation;
-            }
-        
-            for (int j = 0; j < hidden_dim; j++) {
-            prev_activation[j] = activation;
-            }
-        }
-
-        for (int j = 0; j < output_dim; j++) {
-            predictions[i][j] = mulv;
-        }
-   }
-
-
-   //predictions on the validation set
-
-   double **val_predictions = (double **)malloc(num_records * sizeof(double *));
-   for (int i = 0; i < num_records; i++) {
-        val_predictions[i] = (double *)malloc(output_dim * sizeof(double));
-   }
-
-    for (int i = 0; i < num_records; i++) {
-        double *x = X[i];
-        double y = Y[i][0];
-        double *prev_activation = (double *)malloc(hidden_dim * sizeof(double));
-        for (int i = 0; i < hidden_dim; i++) {
-            prev_activation[i] = 0.0;
-        }
-        //memset(prev_activation, 0, hidden_dim * sizeof(double)); // Initialisation à zéro
-
-        for (int timestep = 0; timestep < seq_len; timestep++) {
-
-            double mulu = 0.0;
-            for (int j = 0; j < seq_len; j++) {
-                mulu += U[j][i] * x[j];
-            }
-        
-            double mulw = 0.0;
-            for (int j = 0; j < hidden_dim; j++) {
-                mulw += W[j][i] * prev_activation[j];
-            }
-        
-            double _sum = mulu + mulw;
-        
-            double activation = sigmoid(_sum);
-        
-            double mulv = 0.0;
-            for (int j = 0; j < hidden_dim; j++) {
-                mulv += V[j][i] * activation;
-            }
-        
-            for (int j = 0; j < hidden_dim; j++) {
-            prev_activation[j] = activation;
-            }
-        }
-
-        for (int j = 0; j < output_dim; j++) {
-            val_predictions[i][j] = mulv;
-        }
-    }
-
-
-    //double mse = mean_squared_error(Y_validation, val_predictions, size);
-    //double rmse = sqrt(mse);
-    // Affichage du RMSE
-    //printf("%f\n", rmse);
-    
-    return 0;
-
+typedef struct _rnn RNN;
+struct _rnn {
+  int * layersize;
+
+  int nbneurons;
+  NEURON * n;
 };
+
+typedef struct _config CONFIG;
+struct _config {
+  int nbneurons;
+  int * layersize;
+  int nbsynapses;
+  int * synapses;
+};
+
+CONFIG * createconfig(int * layersize) {
+  CONFIG * conf = (CONFIG*)malloc(sizeof(CONFIG));
+  int i;
+  conf->nbneurons = 0;
+  for(i=1; i<layersize[0]+1; i++) conf->nbneurons += layersize[i];
+  conf->layersize = (int*)malloc((layersize[0]+1)*sizeof(int));
+  for(i=0; i<layersize[0]+1; i++) conf->layersize[i] = layersize[i];
+
+  // Compute the number of synapses:
+  conf->nbsynapses = 0;
+  for(i=1; i<layersize[0]; i++) conf->nbsynapses += layersize[i] * layersize[i+1]; 
+  conf->nbsynapses *= 2;
+
+  // Allocate the table of synapses:
+  conf->synapses = (int*)malloc(2*conf->nbsynapses*sizeof(int));
+
+  // creation of the synapses:
+  int j,k=0,l,k2=0,k3=0;
+  for(i=1;i<layersize[0];i++) {
+    k3 += layersize[i];
+    for(j=0; j<layersize[i]; j++) { 
+      for(l=0; l<layersize[i+1]; l++) {
+        // forward link/synapse:
+        conf->synapses[k] = k2+j;
+        k++;
+        conf->synapses[k] = k3+l;
+        k++;
+        // Recurrent link/synapse:
+        conf->synapses[k] = k3+l;
+        k++;
+        conf->synapses[k] = k2+j;
+        k++;
+
+      }
+    }
+    k2 += layersize[i];
+  }
+  return conf;
+}
+
+void freeconfig(CONFIG* conf) {
+  free(conf->synapses);
+  free(conf->layersize);
+  free(conf);
+}
+
+
+
+RNN * creaternn(CONFIG * conf) {
+
+  RNN * net = (RNN*)malloc(sizeof(RNN));
+  net->nbneurons = conf->nbneurons;
+  net->layersize = (int*)malloc((conf->layersize[0]+1)*sizeof(int));
+  int i;
+  for(i=0; i<conf->layersize[0]+1; i++) net->layersize[i] = conf->layersize[i];
+
+  // Allocate the neuron table of the Recurrent Neural Network:
+  net->n = (NEURON*)malloc(conf->nbneurons*sizeof(NEURON));
+
+  // Initialize some neuron values:
+  int j=0,k=0;
+  for(i=0; i<conf->nbneurons; i++) {
+    if(k==0) { k = conf->layersize[j+1]; j++; }
+    net->n[i].layer = j-1;
+    net->n[i].nbsynapsesin = 0; 
+    k--;
+  }
+
+  // Count the incoming synapses for each neuron:
+  k=0;
+  for(i=0; i<conf->nbsynapses; i++) {
+    k++;
+    net->n[conf->synapses[k]].nbsynapsesin++;
+    k++;
+  }
+
+  // Allocate weight table in neurons, and the table of pointer to neuron
+  // that represent the incoming synapses:
+  for(i=0; i<conf->nbneurons; i++) {
+    net->n[i].weight = (double*)malloc(net->n[i].nbsynapsesin*sizeof(double));
+    net->n[i].synapsesin = (NEURON**)malloc(net->n[i].nbsynapsesin*sizeof(NEURON*));
+    net->n[i].nbsynapsesin = 0;
+  }
+
+  // Link the incoming synapses with the neurons:
+  k=0;
+  for(i=0; i<conf->nbsynapses; i++) {
+    k++;
+    net->n[conf->synapses[k]].synapsesin[net->n[conf->synapses[k]].nbsynapsesin] = &(net->n[conf->synapses[k-1]]);
+    net->n[conf->synapses[k]].nbsynapsesin++;
+    k++;
+  }
+
+  // Initialization of the values, errors, and weights:
+  for(i=0; i<net->nbneurons; i++) {
+    for(j=0; j<net->n[i].nbsynapsesin; j++) {
+      net->n[i].weight[j] = 1.0 * (double)rand() / RAND_MAX - 1.0/2;
+    }
+    net->n[i].bias = 1.0 * (double)rand() / RAND_MAX - 1.0/2;
+    net->n[i].value = 0.0;
+    net->n[i].value_prev = 0.0;
+    net->n[i].error_prev = 0.0;
+    net->n[i].error = 0.0;
+  }
+
+  return net;
+}
+
+
+void freernn(RNN * net) {
+  int i;
+  for(i=0; i<net->nbneurons; i++) {
+    free(net->n[i].weight);
+    free(net->n[i].synapsesin);
+  }
+  free(net->n);
+  free(net->layersize);
+  free(net);
+}
+
+void rnnget(RNN * net, double * out) {
+  int i,k=0;
+  // Store the output of the network in the variable table "out":
+  for(i=net->nbneurons-1; i>=(net->nbneurons - net->layersize[net->layersize[0]]); i--) { out[k] = net->n[i].value; k++; }
+}
+
+void rnnsetstart(RNN * net) {
+  int i,j;
+
+  NEURON *ni,*nj;
+  // For each neuron, update value_prev:
+  for(i=0; i<net->nbneurons; i++) {
+    ni = &(net->n[i]);
+    // If NOT the output layer, then the value is already computed by tanh:
+    if(ni->layer != net->layersize[0]-1) ni->value_prev = ni->value;
+    else ni->value_prev = tanh(ni->value);
+  }
+}
+
+void rnnset(RNN * net, double * in) {
+  int i,j,k;
+  double v;
+
+  NEURON *ni,*nj;
+  // For each neuron:
+  for(i=0; i<net->nbneurons; i++) {
+    ni = &(net->n[i]);
+    // If it is an input neuron:
+    if(i<net->layersize[1]) ni->value = in[i];
+    else ni->value = ni->bias;
+
+    // If the neuron is NOT in input layer, then  
+    // compute the value from the incoming synapses:
+    if(i>=net->layersize[1]) {
+      // For each incoming synapse:
+      for(j=0; j<ni->nbsynapsesin; j++) {
+        nj = ni->synapsesin[j];
+        // If the synapse is from input layer to output layer, then tanh the value:
+        if(nj->layer == 0 && ni->layer == (net->layersize[0]-1)) {
+          ////////////////////////////////////////////////////////////////////////
+          // Uncomment the following line to enable reccurent links computation:
+          ni->value += tanh(nj->value_prev) * ni->weight[j];
+          ////////////////////////////////////////////////////////////////////////
+        } else {
+          // If it is a forward link/synapse:
+          if(ni->layer > nj->layer) ni->value +=  nj->value * ni->weight[j];
+          ////////////////////////////////////////////////////////////////////////
+          // Uncomment the following line to enable reccurent links computation:
+          else ni->value += nj->value_prev * ni->weight[j];
+          ////////////////////////////////////////////////////////////////////////
+        }
+      }
+    }
+    // If NOT the input layer NOR the output layer, then tanh the value:
+    if(ni->layer != 0 && ni->layer != net->layersize[0]-1) ni->value = tanh(ni->value);
+  }
+}
+
+
+void rnnlearnstart(RNN * net) {
+  int i;
+  // For each neuron, initialize error_prev and value_prev for a
+  // new training cycle:
+  for(i=0; i<net->nbneurons; i++) { net->n[i].error_prev = 0.0; net->n[i].value_prev = 0.0; }
+}
+
+void rnnlearn(RNN * net, double * out, double learningrate) {
+  int i,j,k;
+  k=0;
+
+  NEURON *ni,*nj;
+  // Initialize error to zero for the output layer:
+  for(i=net->nbneurons-1; i>=net->nbneurons-net->layersize[net->layersize[0]]; i--) net->n[i].error = 0.0;
+
+  // Compute the error for output neurons, and 
+  // initialize it to 0 for the other neurons:
+  for(i=net->nbneurons-1; i>=0; i--) {
+    ni = &(net->n[i]);
+    // If ni is an output neuron, update the error:
+    if(ni->layer == net->layersize[0]-1) {
+      ni->error += ni->value - out[k];
+      k++;
+    } else {
+      ni->error = 0.0;
+    }
+  }
+
+  // Compute error for all other neurons:
+  for(i=net->nbneurons-1; i>=0; i--) {
+    ni = &(net->n[i]);
+    // For each incoming synapse NOT from output layer:
+    for(j=0; j<ni->nbsynapsesin; j++) {
+      nj = ni->synapsesin[j];
+      // If it is a forward link/synapse:
+      if(ni->layer > nj->layer) nj->error += ni->error * ni->weight[j];
+    }
+  }
+
+  // Update weights:
+  for(i=0; i<net->nbneurons; i++) {
+    ni = &(net->n[i]);
+    double wchange,derivative;
+    // For the output layer:
+    if(ni->layer == net->layersize[0]-1) {
+      derivative = ni->error * learningrate;
+      // For each incoming synapse:
+      for(j=0; j<ni->nbsynapsesin; j++) {
+        nj = ni->synapsesin[j];
+        wchange = derivative;
+        // If it is a forward link/synapse:
+        if(ni->layer > nj->layer) wchange *= nj->value;
+        else wchange *= nj->value_prev;
+        ni->weight[j] -= wchange;
+        if(ni->weight[j] > 5) ni->weight[j] = 5;
+        if(ni->weight[j] < -5) ni->weight[j] = -5;
+      }
+      ni->bias -= derivative;
+      if(ni->bias > 5) ni->bias = 5;
+      if(ni->bias < -5) ni->bias = -5;
+
+    // For the other layers:
+    } else {
+      derivative = 1.0 - ni->value * ni->value;
+      derivative *= ni->error * learningrate;
+      // For each incoming synapse:
+      for(j=0; j<ni->nbsynapsesin; j++) {
+        nj = ni->synapsesin[j];
+        wchange = derivative;
+        // If it is a forward link/synapse:
+        if(ni->layer > nj->layer) wchange *= nj->value;
+        else wchange *= nj->value_prev;
+        ni->weight[j] -= wchange;
+      }
+      ni->bias -= derivative;
+    }
+  }
+
+  // Update error_prev:
+  for(i=0; i<net->nbneurons; i++) net->n[i].error_prev = net->n[i].error;
+}
+
+int main() {
+    srand(time(NULL));
+
+    int layersize_netrnn[] = { 4, 1, 25, 12, 1 };
+    CONFIG * configrnn = createconfig(layersize_netrnn);
+    RNN * netrnn = creaternn(configrnn);
+
+    double inc,outc;
+    double global_error2 = 1;
+    int i2=0;
+    int iter;
+
+    //////////////////////////////////////////////////////
+    // Training of the Recurrent Neural Network:
+    //////////////////////////////////////////////////////
+    while(global_error2 > 0.005 && i2<1000) {
+        rnnlearnstart(netrnn);
+
+        for (iter=0; iter < 100; iter++) {
+            inc = 1.0*rand()/(RAND_MAX+1.0);
+            outc = inc*inc;
+            rnnsetstart(netrnn);
+            rnnset(netrnn,&inc);
+            double outc2;
+            rnnlearn(netrnn,&outc,0.03);
+        }
+
+        global_error2 = 0;
+        int k;
+        for (k=0; k < 100; k++) {
+            inc = 1.0*rand()/(RAND_MAX+1.0);
+            outc = inc*inc;
+            double desired_out = inc*inc;
+
+            rnnsetstart(netrnn);
+            rnnset(netrnn,&inc);
+            rnnget(netrnn,&outc);
+
+            global_error2 += (desired_out - outc)*(desired_out - outc);
+        }
+        global_error2 /= 100;
+        global_error2 = sqrt(global_error2);
+        if(!isnormal(global_error2)) 
+            global_error2 = 100;
+        i2++;
+    }
+
+    printf("\n  RNN:    Training cycles: %5d    Error: %f \n", i2, global_error2);
+
+    freeconfig(configrnn);
+    freernn(netrnn);
+    
+    return 0;

@@ -180,7 +180,7 @@ void rnnget(RNN * net, double * out) {
   for(i=net->nbneurons-1; i>=(net->nbneurons - net->layersize[net->layersize[0]]); i--) { out[k] = net->n[i].value; k++; }
 }
 
-void rnnsetstart(RNN * net) {
+void rnnsetstart(RNN * net, double *input_matrix, double *output_matrix, double *d_weight, int m, int n, int k, size_t size_in_bytes) {
     // Allocate device memory for input and output matrices
     double *d_input, *d_output;
     cudaMalloc(&d_input, size_in_bytes);  // Allocate memory for input matrix
@@ -329,6 +329,18 @@ void rnnlearn(RNN * net, double * out, double learningrate) {
 int main() {
     srand(time(NULL));
 
+    // Déclarations des variables pour les matrices et les poids
+    float *input_matrix, *output_matrix, *d_weight;
+    int k, m, n;
+    size_t taille_input_matrix = /* taille en octets */;
+    size_t taille_output_matrix = /* taille en octets */;
+    size_t taille_d_weight = /* taille en octets */;
+
+    // Allocation de mémoire pour les matrices et les poids sur le GPU
+    cudaMalloc((void**)&input_matrix, taille_input_matrix);
+    cudaMalloc((void**)&output_matrix, taille_output_matrix);
+    cudaMalloc((void**)&d_weight, taille_d_weight);
+
     int layersize_netrnn[] = { 4, 1, 25, 12, 1 };
     CONFIG * configrnn = createconfig(layersize_netrnn);
     RNN * netrnn = creaternn(configrnn);
@@ -341,40 +353,15 @@ int main() {
     //////////////////////////////////////////////////////
     // Training of the Recurrent Neural Network:
     //////////////////////////////////////////////////////
-    while(global_error2 > 0.005 && i2<1000) {
-        rnnlearnstart(netrnn);
 
-        for (iter=0; iter < 100; iter++) {
-            inc = 1.0*rand()/(RAND_MAX+1.0);
-            outc = inc*inc;
-            rnnsetstart(netrnn);
-            rnnset(netrnn,&inc);
-            double outc2;
-            rnnlearn(netrnn,&outc,0.03);
-        }
+    // Votre boucle d'entraînement ici...
 
-        global_error2 = 0;
-        int k;
-        for (k=0; k < 100; k++) {
-            inc = 1.0*rand()/(RAND_MAX+1.0);
-            outc = inc*inc;
-            double desired_out = inc*inc;
+    // Libération de la mémoire allouée sur le GPU
+    cudaFree(input_matrix);
+    cudaFree(output_matrix);
+    cudaFree(d_weight);
 
-            rnnsetstart(netrnn);
-            rnnset(netrnn,&inc);
-            rnnget(netrnn,&outc);
-
-            global_error2 += (desired_out - outc)*(desired_out - outc);
-        }
-        global_error2 /= 100;
-        global_error2 = sqrt(global_error2);
-        if(!isnormal(global_error2)) 
-            global_error2 = 100;
-        i2++;
-    }
-
-    printf("\n  RNN:    Training cycles: %5d    Error: %f \n", i2, global_error2);
-
+    // Libération de la mémoire allouée dynamiquement
     freeconfig(configrnn);
     freernn(netrnn);
     
